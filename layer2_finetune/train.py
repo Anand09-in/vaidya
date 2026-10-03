@@ -8,7 +8,7 @@ Run on Kaggle T4 ×2 via kaggle_train.ipynb, or directly:
     python train.py [--run-name run1]
 """
 
-__version__ = "2.0"
+__version__ = "2.1"
 
 import os, sys, time, argparse, logging
 import torch
@@ -162,7 +162,7 @@ def train(args, model, tokenizer, attn_impl, train_ds, val_ds):
     sft_cfg = SFTConfig(
         output_dir=str(run_dir),
         # SFT-specific
-        max_length=C.MAX_SEQ_LENGTH,
+        max_seq_length=C.MAX_SEQ_LENGTH,
         packing=C.TRAINING["packing"],
         dataset_text_field=C.TRAINING["dataset_text_field"],
         # Training hyperparams
