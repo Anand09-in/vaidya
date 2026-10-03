@@ -8,9 +8,12 @@ Run on Kaggle T4 ×2 via kaggle_train.ipynb, or directly:
     python train.py [--run-name run1]
 """
 
-__version__ = "2.2"
+__version__ = "2.5"
 
 import os, sys, time, argparse, logging
+
+# Hide GPU 1 before torch loads — avoids multi-GPU confusion on single-process runs
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", "0")
 import torch
 import mlflow
 import pandas as pd
@@ -105,7 +108,9 @@ def load_data():
 # ── Model + tokenizer ────────────────────────────────────────────────────────
 def load_model_and_tokenizer():
     cc = torch.cuda.get_device_capability()
-    use_bf16_compute = torch.cuda.is_bf16_supported()
+    # T4 is CC 7.5 — is_bf16_supported() returns True but BF16 is software-emulated (slow).
+    # Only use BF16 on Ampere+ (CC >= 8.0) where it has native hardware support.
+    use_bf16_compute = cc[0] >= 8
 
     bnb_cfg = BitsAndBytesConfig(
         load_in_4bit=True,
@@ -154,8 +159,9 @@ def apply_lora(model):
 
 # ── Train ────────────────────────────────────────────────────────────────────
 def train(args, model, tokenizer, attn_impl, train_ds, val_ds):
-    use_bf16 = torch.cuda.is_bf16_supported()
-    log.info("Training precision: %s", "bf16" if use_bf16 else "fp16")
+    cc_train = torch.cuda.get_device_capability()
+    use_bf16 = cc_train[0] >= 8   # native BF16 only on Ampere+ (CC >= 8.0)
+    log.info("Training precision: %s (CC %d.%d)", "bf16" if use_bf16 else "fp16", cc_train[0], cc_train[1])
 
     run_dir = Path(C.CHECKPOINT_DIR) / args.run_name
 
@@ -168,6 +174,7 @@ def train(args, model, tokenizer, attn_impl, train_ds, val_ds):
         # Training hyperparams
         per_device_train_batch_size=args.batch_size,
         gradient_accumulation_steps=args.grad_accum,
+        max_steps=650,   # safety cap for T4 12-hour session; covers ~95% of 1 epoch
         num_train_epochs=C.TRAINING["num_train_epochs"],
         learning_rate=C.TRAINING["learning_rate"],
         lr_scheduler_type=C.TRAINING["lr_scheduler_type"],
