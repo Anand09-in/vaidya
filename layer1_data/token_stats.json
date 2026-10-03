@@ -1,0 +1,11 @@
+{
+  "max_seq_length": 640,
+  "pct_covered": 0.9647798351352471,
+  "mean_tokens": 287.10363075266145,
+  "p50_tokens": 243,
+  "p95_tokens": 574,
+  "p99_tokens": 940,
+  "max_tokens": 6189,
+  "packing_reduction": 0.42300000000000004,
+  "padding_fraction": 0.2350953206239168
+}

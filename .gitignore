@@ -1,0 +1,56 @@
+# Data (source of truth is S3)
+data/
+checkpoints/
+
+# Model weights
+*.safetensors
+*.gguf
+*.bin
+*.pt
+
+# MLflow
+mlflow.db
+mlruns/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.ipynb_checkpoints/
+
+# AWS credentials (never commit)
+.env
+*.env
+aws_credentials
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs / profiler outputs
+*.json.gz
+trace.json
+*.log
+
+# Quantized model folders (large; pulled from S3)
+vaidya-gptq-4bit/
+vaidya-awq-4bit/
+merged_model/
+
+# Training run outputs
+logs/
+runs/
+wandb/
+
+# Secrets (production)
+layer5_production/.env
+
+# Planning docs (not part of the project)
+intro.md
+vaidya-plan.md

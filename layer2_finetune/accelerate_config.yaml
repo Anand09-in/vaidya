@@ -1,0 +1,20 @@
+# Accelerate config — single GPU with DeepSpeed ZeRO-2
+# Usage: accelerate launch --config_file accelerate_config.yaml train.py
+#
+# NOTE: DeepSpeed ZeRO-2 is designed for multi-GPU training.
+# On single GPU it still helps by offloading optimizer states to CPU,
+# reducing GPU memory by ~30%. Tested on Kaggle P100 (16 GB).
+
+compute_environment: LOCAL_MACHINE
+distributed_type: DEEPSPEED
+deepspeed_config:
+  deepspeed_config_file: ds_config.json
+  zero3_init_flag: false
+machine_rank: 0
+main_training_function: main
+mixed_precision: "auto"      # auto-detects bf16 on Ampere, fp16 on Pascal/Volta
+num_machines: 1
+num_processes: 1
+rdzv_backend: static
+same_network: true
+use_cpu: false
