@@ -20,6 +20,7 @@ from transformers import (
     BitsAndBytesConfig,
 )
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training
+from transformers import TrainingArguments
 from trl import SFTTrainer, SFTConfig
 
 import qlora_config as C
@@ -175,9 +176,9 @@ def train(args, model, tokenizer, attn_impl, train_ds, val_ds):
 
     run_dir = Path(C.CHECKPOINT_DIR) / args.run_name
 
-    sft_cfg = SFTConfig(
+    # Standard training params — stable in TrainingArguments across all versions
+    base_kwargs = dict(
         output_dir=str(run_dir),
-        max_length=C.MAX_SEQ_LENGTH,
         per_device_train_batch_size=args.batch_size,
         gradient_accumulation_steps=args.grad_accum,
         num_train_epochs=C.TRAINING["num_train_epochs"],
@@ -196,11 +197,23 @@ def train(args, model, tokenizer, attn_impl, train_ds, val_ds):
         save_total_limit=C.TRAINING["save_total_limit"],
         load_best_model_at_end=True,
         metric_for_best_model="eval_loss",
-        packing=C.TRAINING["packing"],
-        dataset_text_field=C.TRAINING["dataset_text_field"],
         report_to="mlflow",
         run_name=f"vaidya-qlora-{args.run_name}",
     )
+    # SFT-specific params (packing, max_length) — try SFTConfig first, fall back if API changed
+    sft_extra = dict(
+        max_length=C.MAX_SEQ_LENGTH,
+        packing=C.TRAINING["packing"],
+        dataset_text_field=C.TRAINING["dataset_text_field"],
+    )
+    trainer_sft_kwargs = {}
+    try:
+        sft_cfg = SFTConfig(**base_kwargs, **sft_extra)
+    except TypeError:
+        # Newer TRL decoupled SFTConfig from TrainingArguments — pass SFT params to trainer
+        log.warning("SFTConfig rejected extra kwargs; falling back to TrainingArguments + trainer kwargs")
+        sft_cfg = TrainingArguments(**base_kwargs)
+        trainer_sft_kwargs = sft_extra
 
     import trl
     trainer_kwargs = dict(
@@ -208,6 +221,7 @@ def train(args, model, tokenizer, attn_impl, train_ds, val_ds):
         args=sft_cfg,
         train_dataset=train_ds,
         eval_dataset=val_ds,
+        **trainer_sft_kwargs,
     )
     # TRL 0.12+ renamed tokenizer → processing_class; handle major version bump too
     _parts = trl.__version__.split(".")
