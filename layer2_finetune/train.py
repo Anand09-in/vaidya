@@ -8,7 +8,7 @@ Or with DeepSpeed (single GPU via Accelerate):
     accelerate launch --config_file accelerate_config.yaml train.py
 """
 
-__version__ = "1.0"
+__version__ = "1.2"
 
 import os, sys, time, argparse, logging
 import torch
@@ -178,8 +178,24 @@ def train(args, model, tokenizer, attn_impl, train_ds, val_ds):
 
     run_dir = Path(C.CHECKPOINT_DIR) / args.run_name
 
-    # Standard training params — stable in TrainingArguments across all versions
-    base_kwargs = dict(
+    import re
+
+    def _safe_init(cls, kwargs):
+        """Instantiate cls(**kwargs), retrying after removing each rejected kwarg."""
+        kw = dict(kwargs)
+        for _ in range(20):  # max 20 unknown params before giving up
+            try:
+                return cls(**kw)
+            except TypeError as e:
+                m = re.search(r"unexpected keyword argument '(\w+)'", str(e))
+                if not m:
+                    raise
+                bad = m.group(1)
+                log.warning("%s: dropping unsupported param '%s'", cls.__name__, bad)
+                kw.pop(bad, None)
+        raise RuntimeError(f"Could not instantiate {cls.__name__} after removing params")
+
+    desired = dict(
         output_dir=str(run_dir),
         per_device_train_batch_size=args.batch_size,
         gradient_accumulation_steps=args.grad_accum,
@@ -202,7 +218,6 @@ def train(args, model, tokenizer, attn_impl, train_ds, val_ds):
         report_to="mlflow",
         run_name=f"vaidya-qlora-{args.run_name}",
     )
-    # SFT-specific params (packing, max_length) — try SFTConfig first, fall back if API changed
     sft_extra = dict(
         max_length=C.MAX_SEQ_LENGTH,
         packing=C.TRAINING["packing"],
@@ -210,11 +225,10 @@ def train(args, model, tokenizer, attn_impl, train_ds, val_ds):
     )
     trainer_sft_kwargs = {}
     try:
-        sft_cfg = SFTConfig(**base_kwargs, **sft_extra)
-    except TypeError:
-        # Newer TRL decoupled SFTConfig from TrainingArguments — pass SFT params to trainer
-        log.warning("SFTConfig rejected extra kwargs; falling back to TrainingArguments + trainer kwargs")
-        sft_cfg = TrainingArguments(**base_kwargs)
+        sft_cfg = _safe_init(SFTConfig, {**desired, **sft_extra})
+    except Exception:
+        log.warning("SFTConfig failed; falling back to TrainingArguments + trainer-level SFT params")
+        sft_cfg = _safe_init(TrainingArguments, desired)
         trainer_sft_kwargs = sft_extra
 
     import trl
