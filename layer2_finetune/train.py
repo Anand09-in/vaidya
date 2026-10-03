@@ -8,6 +8,8 @@ Or with DeepSpeed (single GPU via Accelerate):
     accelerate launch --config_file accelerate_config.yaml train.py
 """
 
+__version__ = "1.0"
+
 import os, sys, time, argparse, logging
 import torch
 import mlflow
@@ -294,6 +296,7 @@ def push_to_s3(run_dir: Path, run_name: str):
 # ── Entry point ──────────────────────────────────────────────────────────────
 def main():
     args = parse_args()
+    log.info("train.py version: %s", __version__)
     setup_credentials()
     setup_mlflow()
 

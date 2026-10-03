@@ -3,6 +3,8 @@ Vaidya — Phase 2: QLoRA configuration constants.
 Imported by train.py. All values are data-driven from Phase 1.
 """
 
+__version__ = "1.0"
+
 # ── Model ────────────────────────────────────────────────────
 MODEL_ID = "mistralai/Mistral-7B-Instruct-v0.3"
 
