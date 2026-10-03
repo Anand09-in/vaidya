@@ -8,7 +8,7 @@ Run on Kaggle T4 ×2 via kaggle_train.ipynb, or directly:
     python train.py [--run-name run1]
 """
 
-__version__ = "2.1"
+__version__ = "2.2"
 
 import os, sys, time, argparse, logging
 import torch
@@ -127,7 +127,7 @@ def load_model_and_tokenizer():
     model = AutoModelForCausalLM.from_pretrained(
         C.MODEL_ID,
         quantization_config=bnb_cfg,
-        device_map="auto",
+        device_map={"": 0},   # single GPU — pipeline parallel across T4×2 is slower than 1 GPU
         attn_implementation=attn_impl,
     )
     model = prepare_model_for_kbit_training(
