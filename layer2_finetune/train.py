@@ -8,7 +8,7 @@ Run on Kaggle T4 ×2 via kaggle_train.ipynb, or directly:
     python train.py [--run-name run1]
 """
 
-__version__ = "2.5"
+__version__ = "2.6"
 
 import os, sys, time, argparse, logging
 
@@ -174,7 +174,7 @@ def train(args, model, tokenizer, attn_impl, train_ds, val_ds):
         # Training hyperparams
         per_device_train_batch_size=args.batch_size,
         gradient_accumulation_steps=args.grad_accum,
-        max_steps=650,   # safety cap for T4 12-hour session; covers ~95% of 1 epoch
+        max_steps=500,   # safety cap for T4 12-hour session; covers ~74% of 1 epoch
         num_train_epochs=C.TRAINING["num_train_epochs"],
         learning_rate=C.TRAINING["learning_rate"],
         lr_scheduler_type=C.TRAINING["lr_scheduler_type"],
