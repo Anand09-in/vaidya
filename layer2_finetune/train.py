@@ -8,7 +8,7 @@ Run on Kaggle T4 ×2 via kaggle_train.ipynb, or directly:
     python train.py [--run-name run1]
 """
 
-__version__ = "2.7"
+__version__ = "2.8"
 
 import os, sys, time, argparse, logging
 
@@ -40,6 +40,7 @@ def parse_args():
                    help="Name for this training run (used in checkpoint dir and MLflow)")
     p.add_argument("--batch-size", type=int, default=C.TRAINING["per_device_train_batch_size"])
     p.add_argument("--grad-accum", type=int, default=C.TRAINING["gradient_accumulation_steps"])
+    p.add_argument("--max-steps", type=int, default=-1, help="Cap training steps (-1 = full epoch)")
     return p.parse_args()
 
 
@@ -174,6 +175,7 @@ def train(args, model, tokenizer, attn_impl, train_ds, val_ds):
         # Training hyperparams
         per_device_train_batch_size=args.batch_size,
         gradient_accumulation_steps=args.grad_accum,
+        max_steps=args.max_steps,
         num_train_epochs=C.TRAINING["num_train_epochs"],
         learning_rate=C.TRAINING["learning_rate"],
         lr_scheduler_type=C.TRAINING["lr_scheduler_type"],
