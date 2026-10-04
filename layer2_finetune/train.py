@@ -8,7 +8,7 @@ Run on Kaggle T4 ×2 via kaggle_train.ipynb, or directly:
     python train.py [--run-name run1]
 """
 
-__version__ = "2.9"
+__version__ = "2.10"
 
 import os, sys, time, argparse, logging
 
@@ -81,7 +81,7 @@ def load_data():
     if Path("/kaggle/working").exists():
         data_dir = Path("/kaggle/working/data")
     else:
-        data_dir = Path(__file__).resolve().parent.parent / "data"
+        data_dir = Path(__file__).resolve().parent / "data"
 
     data_dir.mkdir(parents=True, exist_ok=True)
     train_path = data_dir / "train.parquet"
