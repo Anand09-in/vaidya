@@ -3,7 +3,7 @@ Vaidya — Phase 2: QLoRA configuration constants.
 Imported by train.py. All values are data-driven from Phase 1.
 """
 
-__version__ = "1.1"
+__version__ = "1.3"
 
 # ── Model ────────────────────────────────────────────────────
 MODEL_ID = "mistralai/Mistral-7B-Instruct-v0.3"
@@ -41,10 +41,10 @@ TRAINING = dict(
     warmup_ratio=0.05,
     gradient_checkpointing=True,
     logging_steps=50,
-    eval_strategy="steps",
-    eval_steps=100,
+    eval_strategy="no",
+    eval_steps=500,
     save_strategy="steps",
-    save_steps=100,
+    save_steps=200,
     save_total_limit=3,
     load_best_model_at_end=True,
     metric_for_best_model="eval_loss",
