@@ -3,7 +3,7 @@ Vaidya — Phase 2: QLoRA configuration constants.
 Imported by train.py. All values are data-driven from Phase 1.
 """
 
-__version__ = "1.5"
+__version__ = "1.6"
 
 # ── Model ────────────────────────────────────────────────────
 MODEL_ID = "mistralai/Mistral-7B-Instruct-v0.3"
@@ -33,8 +33,8 @@ LORA = dict(
 # Effective batch = per_device_train_batch_size * gradient_accumulation_steps = 32
 # If OOM on P100: reduce BATCH_SIZE to 1 and set GRAD_ACCUM = 32
 TRAINING = dict(
-    per_device_train_batch_size=4,
-    gradient_accumulation_steps=8,
+    per_device_train_batch_size=8,
+    gradient_accumulation_steps=4,
     num_train_epochs=1,
     learning_rate=2e-4,
     lr_scheduler_type="cosine",
