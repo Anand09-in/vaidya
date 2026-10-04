@@ -8,7 +8,7 @@ Run on Kaggle T4 ×2 via kaggle_train.ipynb, or directly:
     python train.py [--run-name run1]
 """
 
-__version__ = "2.10"
+__version__ = "2.11"
 
 import os, sys, time, argparse, logging
 
@@ -190,8 +190,7 @@ def train(args, model, tokenizer, attn_impl, train_ds, val_ds):
         save_strategy=C.TRAINING["save_strategy"],
         save_steps=C.TRAINING["save_steps"],
         save_total_limit=C.TRAINING["save_total_limit"],
-        load_best_model_at_end=True,
-        metric_for_best_model="eval_loss",
+        load_best_model_at_end=False,
         report_to="mlflow",
         run_name=f"vaidya-qlora-{args.run_name}",
     )
