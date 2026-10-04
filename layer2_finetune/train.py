@@ -8,7 +8,7 @@ Run on Kaggle T4 ×2 via kaggle_train.ipynb, or directly:
     python train.py [--run-name run1]
 """
 
-__version__ = "2.8"
+__version__ = "2.9"
 
 import os, sys, time, argparse, logging
 
@@ -66,14 +66,14 @@ def setup_credentials():
 
 # ── MLflow ───────────────────────────────────────────────────────────────────
 def setup_mlflow():
-    mlflow.set_tracking_uri("sqlite:///mlflow.db")
+    mlflow.set_tracking_uri("./mlruns")   # file-based — no SQLAlchemy dependency
     try:
         mlflow.create_experiment("vaidya-qlora",
                                  artifact_location=f"{C.S3_BUCKET}/mlflow")
     except Exception:
         pass  # already exists
     mlflow.set_experiment("vaidya-qlora")
-    log.info("MLflow → sqlite:///mlflow.db  |  artifacts → %s/mlflow", C.S3_BUCKET)
+    log.info("MLflow → ./mlruns  |  artifacts → %s/mlflow", C.S3_BUCKET)
 
 
 # ── Data ─────────────────────────────────────────────────────────────────────
@@ -254,10 +254,13 @@ def push_to_s3(run_dir: Path, run_name: str):
             uploaded += 1
     log.info("Uploaded %d files → %s/checkpoints/%s/", uploaded, C.S3_BUCKET, run_name)
 
-    mlflow_db = Path("mlflow.db")
-    if mlflow_db.exists():
-        s3.upload_file(str(mlflow_db), bucket, "mlflow/mlflow.db")
-        log.info("MLflow db → %s/mlflow/mlflow.db", C.S3_BUCKET)
+    mlruns_dir = Path("mlruns")
+    if mlruns_dir.exists():
+        for f in mlruns_dir.rglob("*"):
+            if f.is_file():
+                key = f"mlflow/{f.relative_to('.').as_posix()}"
+                s3.upload_file(str(f), bucket, key)
+        log.info("MLflow runs → %s/mlflow/", C.S3_BUCKET)
 
 
 # ── Entry point ──────────────────────────────────────────────────────────────
