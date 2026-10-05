@@ -14,6 +14,7 @@ import os, sys, time, argparse, logging
 
 # Hide GPU 1 before torch loads — avoids multi-GPU confusion on single-process runs
 os.environ.setdefault("CUDA_VISIBLE_DEVICES", "0")
+os.environ.setdefault("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
 import torch
 import mlflow
 import pandas as pd

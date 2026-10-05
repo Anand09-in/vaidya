@@ -33,13 +33,13 @@ LORA = dict(
 # Effective batch = per_device_train_batch_size * gradient_accumulation_steps = 32
 # If OOM on P100: reduce BATCH_SIZE to 1 and set GRAD_ACCUM = 32
 TRAINING = dict(
-    per_device_train_batch_size=32,
+    per_device_train_batch_size=64,
     gradient_accumulation_steps=1,
     num_train_epochs=1,
     learning_rate=2e-4,
     lr_scheduler_type="cosine",
     warmup_ratio=0.05,
-    gradient_checkpointing=False,
+    gradient_checkpointing=True,
     logging_steps=50,
     eval_strategy="no",
     eval_steps=500,
