@@ -1,0 +1,61 @@
+{
+  "base": {
+    "accuracy": 0.452,
+    "correct": 452,
+    "total": 1000,
+    "subject_accuracy": {
+      "anaesthesia": 0.29411764705882354,
+      "anatomy": 0.4025974025974026,
+      "biochemistry": 0.56,
+      "dental": 0.3191489361702128,
+      "ent": 0.4074074074074074,
+      "forensic medicine": 0.37142857142857144,
+      "gynaecology & obstetrics": 0.39622641509433965,
+      "medicine": 0.5222222222222223,
+      "microbiology": 0.4126984126984127,
+      "ophthalmology": 0.42105263157894735,
+      "orthopaedics": 0.47058823529411764,
+      "pathology": 0.524390243902439,
+      "pediatrics": 0.4090909090909091,
+      "pharmacology": 0.5897435897435898,
+      "physiology": 0.36538461538461536,
+      "psychiatry": 0.5652173913043478,
+      "radiology": 0.38461538461538464,
+      "skin": 0.2727272727272727,
+      "social & preventive medicine": 0.5223880597014925,
+      "surgery": 0.42045454545454547,
+      "unknown": 0.4666666666666667
+    },
+    "parse_errors": 122
+  },
+  "finetuned": {
+    "accuracy": 0.303,
+    "correct": 303,
+    "total": 1000,
+    "subject_accuracy": {
+      "anaesthesia": 0.35294117647058826,
+      "anatomy": 0.24675324675324675,
+      "biochemistry": 0.48,
+      "dental": 0.10638297872340426,
+      "ent": 0.3333333333333333,
+      "forensic medicine": 0.37142857142857144,
+      "gynaecology & obstetrics": 0.24528301886792453,
+      "medicine": 0.3333333333333333,
+      "microbiology": 0.3492063492063492,
+      "ophthalmology": 0.34210526315789475,
+      "orthopaedics": 0.4117647058823529,
+      "pathology": 0.3048780487804878,
+      "pediatrics": 0.36363636363636365,
+      "pharmacology": 0.2564102564102564,
+      "physiology": 0.17307692307692307,
+      "psychiatry": 0.391304347826087,
+      "radiology": 0.34615384615384615,
+      "skin": 0.45454545454545453,
+      "social & preventive medicine": 0.2835820895522388,
+      "surgery": 0.25,
+      "unknown": 0.5333333333333333
+    },
+    "parse_errors": 405
+  },
+  "delta": -0.14900000000000002
+}

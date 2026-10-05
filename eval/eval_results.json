@@ -1,0 +1,61 @@
+{
+  "base": {
+    "accuracy": 0.448,
+    "correct": 448,
+    "total": 1000,
+    "subject_accuracy": {
+      "anaesthesia": 0.29411764705882354,
+      "anatomy": 0.33766233766233766,
+      "biochemistry": 0.52,
+      "dental": 0.3404255319148936,
+      "ent": 0.4444444444444444,
+      "forensic medicine": 0.45714285714285713,
+      "gynaecology & obstetrics": 0.4339622641509434,
+      "medicine": 0.4777777777777778,
+      "microbiology": 0.4603174603174603,
+      "ophthalmology": 0.42105263157894735,
+      "orthopaedics": 0.47058823529411764,
+      "pathology": 0.5,
+      "pediatrics": 0.5227272727272727,
+      "pharmacology": 0.5256410256410257,
+      "physiology": 0.36538461538461536,
+      "psychiatry": 0.6956521739130435,
+      "radiology": 0.38461538461538464,
+      "skin": 0.36363636363636365,
+      "social & preventive medicine": 0.5074626865671642,
+      "surgery": 0.36363636363636365,
+      "unknown": 0.5333333333333333
+    },
+    "parse_errors": 147
+  },
+  "finetuned": {
+    "accuracy": 0.593,
+    "correct": 593,
+    "total": 1000,
+    "subject_accuracy": {
+      "anaesthesia": 0.5882352941176471,
+      "anatomy": 0.6233766233766234,
+      "biochemistry": 0.64,
+      "dental": 0.44680851063829785,
+      "ent": 0.5185185185185185,
+      "forensic medicine": 0.6,
+      "gynaecology & obstetrics": 0.49056603773584906,
+      "medicine": 0.6222222222222222,
+      "microbiology": 0.5873015873015873,
+      "ophthalmology": 0.5,
+      "orthopaedics": 0.7647058823529411,
+      "pathology": 0.6463414634146342,
+      "pediatrics": 0.6818181818181818,
+      "pharmacology": 0.6666666666666666,
+      "physiology": 0.46153846153846156,
+      "psychiatry": 0.7391304347826086,
+      "radiology": 0.5384615384615384,
+      "skin": 0.45454545454545453,
+      "social & preventive medicine": 0.6119402985074627,
+      "surgery": 0.5795454545454546,
+      "unknown": 0.6
+    },
+    "parse_errors": 0
+  },
+  "delta": 0.14499999999999996
+}

@@ -1,0 +1,19 @@
+{
+  "finetuned": {
+    "accuracy": 0.6666666666666666,
+    "correct": 6,
+    "total": 9,
+    "subject_accuracy": {
+      "anatomy": 1.0,
+      "gynaecology & obstetrics": 0.0,
+      "medicine": 1.0,
+      "microbiology": 0.0,
+      "pathology": 1.0,
+      "pharmacology": 1.0,
+      "physiology": 0.0,
+      "social & preventive medicine": 1.0,
+      "surgery": 1.0
+    },
+    "parse_errors": 0
+  }
+}
