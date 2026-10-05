@@ -7,7 +7,7 @@ Usage:
     python eval_accuracy.py --run-name run2 --n-samples 1000 --base-only
 """
 
-__version__ = "1.0"
+__version__ = "1.1"
 
 import os, re, sys, json, argparse, logging
 from pathlib import Path
@@ -35,6 +35,7 @@ def parse_args():
     p.add_argument("--n-samples", type=int, default=1000, help="Stratified sample size from test set")
     p.add_argument("--base-only", action="store_true", help="Only eval base model (skip fine-tuned)")
     p.add_argument("--finetuned-only", action="store_true", help="Only eval fine-tuned (skip base)")
+    p.add_argument("--debug", action="store_true", help="Print 5 sample generations to verify output format")
     return p.parse_args()
 
 
@@ -119,18 +120,19 @@ def load_finetuned_model(run_name: str):
 
 # ── Inference ─────────────────────────────────────────────────────────────────
 def build_prompt(row: dict, tokenizer) -> str:
-    label_map = {0: "A", 1: "B", 2: "C", 3: "D"}
-    messages = [
-        {"role": "system",
-         "content": "You are Vaidya, an expert in Indian medical licensing exams. "
-                    "Answer by selecting the single best option."},
-        {"role": "user",
-         "content": (
-             f"Question: {row['question']}\n\n"
-             f"Options:\nA. {row['opa']}\nB. {row['opb']}\nC. {row['opc']}\nD. {row['opd']}"
-         )},
-    ]
-    return tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+    # Must match the ChatML format used in training data (layer1_data/02_clean_format.ipynb)
+    # NOT tokenizer.apply_chat_template() which outputs Mistral [INST] format
+    return (
+        "<|im_start|>system\n"
+        "You are Vaidya, an expert in Indian medical licensing exams (AIIMS, PGI, USMLE-equivalent). "
+        "Answer the question by selecting the single best option.\n"
+        "<|im_end|>\n"
+        "<|im_start|>user\n"
+        f"Question: {row['question']}\n\n"
+        f"Options:\nA. {row['opa']}\nB. {row['opb']}\nC. {row['opc']}\nD. {row['opd']}\n"
+        "<|im_end|>\n"
+        "<|im_start|>assistant\n"
+    )
 
 
 def extract_answer(text: str) -> str | None:
@@ -149,7 +151,7 @@ def extract_answer(text: str) -> str | None:
 
 
 @torch.inference_mode()
-def evaluate(model, tokenizer, df: pd.DataFrame, batch_size: int = 8) -> dict:
+def evaluate(model, tokenizer, df: pd.DataFrame, batch_size: int = 8, debug: bool = False) -> dict:
     model.eval()
     correct = 0
     total = 0
@@ -175,6 +177,11 @@ def evaluate(model, tokenizer, df: pd.DataFrame, batch_size: int = 8) -> dict:
             generated = tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
             pred = extract_answer(generated)
             hit = pred == label
+            if debug and total < 5:
+                print(f"\n--- Sample {total+1} ---")
+                print(f"  Label   : {label}")
+                print(f"  Output  : {repr(generated[:120])}")
+                print(f"  Pred    : {pred}  {'✅' if hit else '❌'}")
             correct += int(hit)
             total += 1
             per_subject.setdefault(subj, []).append(hit)
@@ -218,7 +225,7 @@ def main():
     if not args.finetuned_only:
         log.info("=== Evaluating BASE model ===")
         model, tokenizer = load_base_model()
-        results["base"] = evaluate(model, tokenizer, df)
+        results["base"] = evaluate(model, tokenizer, df, debug=args.debug)
         log.info("Base accuracy: %.2f%%", results["base"]["accuracy"] * 100)
         del model
         torch.cuda.empty_cache()
@@ -226,7 +233,7 @@ def main():
     if not args.base_only:
         log.info("=== Evaluating FINE-TUNED model (run=%s) ===", args.run_name)
         model, tokenizer = load_finetuned_model(args.run_name)
-        results["finetuned"] = evaluate(model, tokenizer, df)
+        results["finetuned"] = evaluate(model, tokenizer, df, debug=args.debug)
         log.info("Fine-tuned accuracy: %.2f%%", results["finetuned"]["accuracy"] * 100)
 
     # ── Summary ──────────────────────────────────────────────────────────────
