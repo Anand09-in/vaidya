@@ -33,7 +33,7 @@ awscli>=1.33.0
 
 # --- Phase 5: Quantization -----------------------------------
 optimum>=1.22.0
-auto-gptq>=0.7.0              # GPU only
+gptqmodel>=0.9.0              # GPU only (successor to auto-gptq)
 autoawq>=0.2.7                # GPU only
 # llama-cpp-python installed separately (needs cmake; see layer4_optimize/README)
 

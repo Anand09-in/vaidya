@@ -39,12 +39,12 @@ def download_merged():
 
 def load_calibration_data(n=128):
     import pandas as pd
-    val_path = Path("./data/val.parquet")
-    if not val_path.exists():
+    train_path = Path("./data/train.parquet")
+    if not train_path.exists():
         import boto3
-        s3 = boto3.client("s3"); val_path.parent.mkdir(exist_ok=True)
-        s3.download_file(C.S3_BUCKET.replace("s3://", ""), "data/val.parquet", str(val_path))
-    df = pd.read_parquet(val_path).sample(n, random_state=42)
+        s3 = boto3.client("s3"); train_path.parent.mkdir(exist_ok=True)
+        s3.download_file(C.S3_BUCKET.replace("s3://", ""), "data/train.parquet", str(train_path))
+    df = pd.read_parquet(train_path).sample(n, random_state=42)
     return [
         f"<|im_start|>user\nQuestion: {row['question']}\n"
         f"A. {row['opa']}\nB. {row['opb']}\nC. {row['opc']}\nD. {row['opd']}\n<|im_end|>\n"

@@ -14,7 +14,7 @@ Usage:
 
 __version__ = "1.0"
 
-import os, sys, json, argparse, logging, random
+import sys, json, argparse, logging, random
 from pathlib import Path
 
 import pandas as pd
@@ -71,22 +71,21 @@ def main():
     args = parse_args()
     random.seed(args.seed)
 
-    # Load val set
+    # Use train set for DPO pairs (val stays held-out for evaluation)
     data_dir = Path("./data")
-    val_path = data_dir / "val.parquet"
-    if not val_path.exists():
-        log.info("Downloading val.parquet from S3...")
+    train_path = data_dir / "train.parquet"
+    if not train_path.exists():
+        log.info("Downloading train.parquet from S3...")
         import boto3
         s3 = boto3.client("s3")
         bucket = C.S3_BUCKET.replace("s3://", "")
         data_dir.mkdir(exist_ok=True)
-        s3.download_file(bucket, "data/val.parquet", str(val_path))
+        s3.download_file(bucket, "data/train.parquet", str(train_path))
 
-    df = pd.read_parquet(val_path)
-    # Drop rows missing required fields
+    df = pd.read_parquet(train_path)
     df = df.dropna(subset=["question", "opa", "opb", "opc", "opd", "cop"])
     df = df.sample(min(args.n_pairs, len(df)), random_state=args.seed).reset_index(drop=True)
-    log.info("Generating %d DPO pairs from val set", len(df))
+    log.info("Generating %d DPO pairs from train set", len(df))
 
     pairs = []
     for _, row in df.iterrows():

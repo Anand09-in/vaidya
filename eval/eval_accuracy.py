@@ -19,8 +19,10 @@ from datasets import Dataset
 from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import PeftModel
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "layer2_finetune"))
+_layer2 = str(Path(__file__).resolve().parent.parent / "layer2_finetune")
+sys.path.insert(0, _layer2)
 import qlora_config as C
+from utils import setup_mlflow
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -201,22 +203,11 @@ def evaluate(model, tokenizer, df: pd.DataFrame, batch_size: int = 8, debug: boo
     }
 
 
-# ── MLflow ───────────────────────────────────────────────────────────────────
-def setup_mlflow():
-    mlflow.set_tracking_uri("./mlruns")
-    try:
-        mlflow.create_experiment("vaidya-eval",
-                                 artifact_location=f"{C.S3_BUCKET}/mlflow")
-    except Exception:
-        pass
-    mlflow.set_experiment("vaidya-eval")
-
-
 # ── Main ─────────────────────────────────────────────────────────────────────
 def main():
     args = parse_args()
     log.info("eval_accuracy.py v%s  |  run=%s  n=%d", __version__, args.run_name, args.n_samples)
-    setup_mlflow()
+    setup_mlflow("vaidya-eval", C.S3_BUCKET)
 
     df = load_test_data(args.n_samples)
 

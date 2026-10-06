@@ -11,14 +11,6 @@ MODEL_ID = "mistralai/Mistral-7B-Instruct-v0.3"
 # ── Data (from Phase 1 token_stats.json) ─────────────────────
 MAX_SEQ_LENGTH = 640      # p95 = 574, rounded to nearest 128
 
-# ── 4-bit quantization (BitsAndBytes NF4) ────────────────────
-BNB = dict(
-    load_in_4bit=True,
-    bnb_4bit_compute_dtype="bfloat16",   # compute in bf16 even when storing in 4-bit
-    bnb_4bit_use_double_quant=True,      # 2nd quantization of quant constants → ~0.4 bpw saving
-    bnb_4bit_quant_type="nf4",           # Normal Float 4 — best for normally distributed weights
-)
-
 # ── LoRA ─────────────────────────────────────────────────────
 LORA = dict(
     r=16,
@@ -29,9 +21,8 @@ LORA = dict(
     task_type="CAUSAL_LM",
 )
 
-# ── Training (tuned for P100 16 GB, max_seq_length=640) ──────
-# Effective batch = per_device_train_batch_size * gradient_accumulation_steps = 32
-# If OOM on P100: reduce BATCH_SIZE to 1 and set GRAD_ACCUM = 32
+# ── Training (tuned for A100 80 GB, max_seq_length=640) ──────
+# Effective batch = per_device_train_batch_size * gradient_accumulation_steps = 64
 TRAINING = dict(
     per_device_train_batch_size=64,
     gradient_accumulation_steps=1,
@@ -47,7 +38,6 @@ TRAINING = dict(
     save_steps=200,
     save_total_limit=3,
     load_best_model_at_end=False,
-    metric_for_best_model="eval_loss",
     packing=True,           # sequence packing via TRL ConstantLengthDataset
     dataset_text_field="text",
 )

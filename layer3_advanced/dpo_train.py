@@ -23,8 +23,10 @@ from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from peft import LoraConfig, get_peft_model, prepare_model_for_kbit_training, PeftModel
 from trl import DPOTrainer, DPOConfig
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "layer2_finetune"))
+_layer2 = str(Path(__file__).resolve().parent.parent / "layer2_finetune")
+sys.path.insert(0, _layer2)
 import qlora_config as C
+from utils import setup_credentials, push_to_s3, setup_mlflow
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
@@ -35,25 +37,6 @@ def parse_args():
     p.add_argument("--sft-run-name", default="run3", help="Phase 2 checkpoint to build on")
     p.add_argument("--run-name",     default="dpo-run1", help="Name for this DPO run")
     return p.parse_args()
-
-
-def setup_credentials():
-    if os.environ.get("KAGGLE_KERNEL_RUN_TYPE"):
-        from kaggle_secrets import UserSecretsClient
-        s = UserSecretsClient()
-        os.environ["AWS_ACCESS_KEY_ID"]     = s.get_secret("AWS_ACCESS_KEY_ID")
-        os.environ["AWS_SECRET_ACCESS_KEY"] = s.get_secret("AWS_SECRET_ACCESS_KEY")
-        os.environ["AWS_DEFAULT_REGION"]    = s.get_secret("AWS_DEFAULT_REGION")
-
-
-def setup_mlflow():
-    mlflow.set_tracking_uri("./mlruns")
-    try:
-        mlflow.create_experiment("vaidya-dpo",
-                                 artifact_location=f"{C.S3_BUCKET}/mlflow")
-    except Exception:
-        pass
-    mlflow.set_experiment("vaidya-dpo")
 
 
 def load_dpo_pairs() -> Dataset:
@@ -180,38 +163,18 @@ def train(args, model, tokenizer, dataset):
     return run_dir
 
 
-def push_to_s3(run_dir: Path, run_name: str):
-    import boto3
-    s3 = boto3.client("s3")
-    bucket = C.S3_BUCKET.replace("s3://", "")
-    uploaded = 0
-    for f in run_dir.rglob("*"):
-        if f.is_file():
-            key = f"checkpoints/{run_name}/{f.relative_to(run_dir).as_posix()}"
-            s3.upload_file(str(f), bucket, key)
-            uploaded += 1
-    log.info("Uploaded %d files → %s/checkpoints/%s/", uploaded, C.S3_BUCKET, run_name)
-
-    mlruns_dir = Path("mlruns")
-    if mlruns_dir.exists():
-        for f in mlruns_dir.rglob("*"):
-            if f.is_file():
-                key = f"mlflow/{f.relative_to('.').as_posix()}"
-                s3.upload_file(str(f), bucket, key)
-
-
 def main():
     args = parse_args()
     log.info("dpo_train.py v%s  |  sft=%s  run=%s", __version__, args.sft_run_name, args.run_name)
     setup_credentials()
-    setup_mlflow()
+    setup_mlflow("vaidya-dpo", C.S3_BUCKET)
 
     dataset        = load_dpo_pairs()
     model, tokenizer = load_model(args.sft_run_name)
     run_dir          = train(args, model, tokenizer, dataset)
 
     try:
-        push_to_s3(run_dir, args.run_name)
+        push_to_s3(run_dir, args.run_name, C.S3_BUCKET)
     except Exception as e:
         log.warning("S3 upload failed: %s", e)
 

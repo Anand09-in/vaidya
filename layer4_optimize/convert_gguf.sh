@@ -87,22 +87,23 @@ done
 
 # ── 6. Upload to S3 ────────────────────────────────────────────────────────
 echo "Uploading GGUF models to S3..."
-python3 - <<PY
-import sys, os, boto3
-sys.path.insert(0, os.path.join(os.path.dirname('$0'), '..', 'layer2_finetune'))
+# Single-quoted heredoc (<<'PY') prevents shell from expanding $variables inside Python code.
+python3 - "$OUT_DIR" <<'PY'
+import sys, boto3
+sys.path.insert(0, '../layer2_finetune')
 import qlora_config as C
 from pathlib import Path
 
+out_dir = Path(sys.argv[1])
 s3 = boto3.client('s3')
 bucket = C.S3_BUCKET.replace('s3://', '')
-out_dir = Path('$OUT_DIR')
 uploaded = 0
 for f in out_dir.glob('*.gguf'):
     key = f'models/gguf/{f.name}'
     print(f'  Uploading {f.name}...')
     s3.upload_file(str(f), bucket, key)
     uploaded += 1
-print(f'Uploaded {uploaded} GGUF file(s) → {C.S3_BUCKET}/models/gguf/')
+print(f'Uploaded {uploaded} GGUF file(s) -> {C.S3_BUCKET}/models/gguf/')
 PY
 
 echo ""

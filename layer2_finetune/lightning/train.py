@@ -30,6 +30,12 @@ from trl import SFTTrainer, SFTConfig
 
 import qlora_config as C
 
+# Append parent dir so utils.py is importable without shadowing the local qlora_config
+_parent = str(Path(__file__).resolve().parent.parent)
+if _parent not in sys.path:
+    sys.path.append(_parent)
+from utils import setup_credentials, push_to_s3, setup_mlflow
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
@@ -43,38 +49,6 @@ def parse_args():
     p.add_argument("--grad-accum", type=int, default=C.TRAINING["gradient_accumulation_steps"])
     p.add_argument("--max-steps", type=int, default=-1, help="Cap training steps (-1 = full epoch)")
     return p.parse_args()
-
-
-# ── AWS / credentials ────────────────────────────────────────────────────────
-def setup_credentials():
-    if os.environ.get("KAGGLE_KERNEL_RUN_TYPE"):
-        from kaggle_secrets import UserSecretsClient
-        s = UserSecretsClient()
-        os.environ["AWS_ACCESS_KEY_ID"]     = s.get_secret("AWS_ACCESS_KEY_ID")
-        os.environ["AWS_SECRET_ACCESS_KEY"] = s.get_secret("AWS_SECRET_ACCESS_KEY")
-        os.environ["AWS_DEFAULT_REGION"]    = s.get_secret("AWS_DEFAULT_REGION")
-        log.info("AWS credentials loaded from Kaggle secrets.")
-    elif "google.colab" in sys.modules:
-        from google.colab import userdata
-        os.environ["AWS_ACCESS_KEY_ID"]     = userdata.get("AWS_ACCESS_KEY_ID")
-        os.environ["AWS_SECRET_ACCESS_KEY"] = userdata.get("AWS_SECRET_ACCESS_KEY")
-        os.environ["AWS_DEFAULT_REGION"]    = userdata.get("AWS_DEFAULT_REGION")
-        log.info("AWS credentials loaded from Colab secrets.")
-    else:
-        os.environ.setdefault("AWS_PROFILE", "vaidya")
-        log.info("Using AWS profile: vaidya")
-
-
-# ── MLflow ───────────────────────────────────────────────────────────────────
-def setup_mlflow():
-    mlflow.set_tracking_uri("./mlruns")   # file-based — no SQLAlchemy dependency
-    try:
-        mlflow.create_experiment("vaidya-qlora",
-                                 artifact_location=f"{C.S3_BUCKET}/mlflow")
-    except Exception:
-        pass  # already exists
-    mlflow.set_experiment("vaidya-qlora")
-    log.info("MLflow → ./mlruns  |  artifacts → %s/mlflow", C.S3_BUCKET)
 
 
 # ── Data ─────────────────────────────────────────────────────────────────────
@@ -240,35 +214,12 @@ def train(args, model, tokenizer, attn_impl, train_ds, val_ds):
     return trainer, run_dir
 
 
-# ── S3 upload ────────────────────────────────────────────────────────────────
-def push_to_s3(run_dir: Path, run_name: str):
-    import boto3
-    s3 = boto3.client("s3")
-    bucket = C.S3_BUCKET.replace("s3://", "")
-
-    uploaded = 0
-    for f in run_dir.rglob("*"):
-        if f.is_file():
-            key = f"checkpoints/{run_name}/{f.relative_to(run_dir).as_posix()}"
-            s3.upload_file(str(f), bucket, key)
-            uploaded += 1
-    log.info("Uploaded %d files → %s/checkpoints/%s/", uploaded, C.S3_BUCKET, run_name)
-
-    mlruns_dir = Path("mlruns")
-    if mlruns_dir.exists():
-        for f in mlruns_dir.rglob("*"):
-            if f.is_file():
-                key = f"mlflow/{f.relative_to('.').as_posix()}"
-                s3.upload_file(str(f), bucket, key)
-        log.info("MLflow runs → %s/mlflow/", C.S3_BUCKET)
-
-
 # ── Entry point ──────────────────────────────────────────────────────────────
 def main():
     args = parse_args()
     log.info("train.py v%s", __version__)
     setup_credentials()
-    setup_mlflow()
+    setup_mlflow("vaidya-qlora", C.S3_BUCKET)
 
     train_ds, val_ds            = load_data()
     model, tokenizer, attn_impl = load_model_and_tokenizer()
@@ -276,7 +227,7 @@ def main():
     trainer, run_dir            = train(args, model, tokenizer, attn_impl, train_ds, val_ds)
 
     try:
-        push_to_s3(run_dir, args.run_name)
+        push_to_s3(run_dir, args.run_name, C.S3_BUCKET)
     except Exception as e:
         log.warning("S3 upload failed — checkpoint still local at %s: %s", run_dir, e)
 

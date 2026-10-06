@@ -11,7 +11,7 @@ Usage:
 
 __version__ = "1.0"
 
-import os, sys, argparse, logging, time
+import sys, argparse, logging, time
 from pathlib import Path
 
 import torch
@@ -136,6 +136,11 @@ def main():
 
     # Push to HuggingFace Hub
     if not args.skip_hub:
+        import os
+        from huggingface_hub import login as hf_login
+        hf_token = os.environ.get("HF_TOKEN")
+        if hf_token:
+            hf_login(token=hf_token)
         log.info("Pushing to HuggingFace Hub: %s ...", HF_REPO)
         model.push_to_hub(HF_REPO, safe_serialization=True)
         tokenizer.push_to_hub(HF_REPO)
