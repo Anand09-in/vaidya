@@ -97,7 +97,7 @@ def bench_hf(model_dir: Path, n_runs: int, label: str):
 
 
 def bench_gptq(n_runs: int):
-    from auto_gptq import AutoGPTQForCausalLM
+    from gptqmodel import GPTQModel
     from transformers import AutoTokenizer
     import torch
 
@@ -107,9 +107,7 @@ def bench_gptq(n_runs: int):
         return None
 
     tokenizer = AutoTokenizer.from_pretrained(str(gptq_dir))
-    model = AutoGPTQForCausalLM.from_quantized(
-        str(gptq_dir), device="cuda:0", use_safetensors=True
-    )
+    model = GPTQModel.load(str(gptq_dir), device="cuda:0")
     model.eval()
 
     inputs = tokenizer(TEST_PROMPT, return_tensors="pt").to("cuda")
