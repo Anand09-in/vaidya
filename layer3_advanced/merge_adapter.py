@@ -24,7 +24,7 @@ import qlora_config as C
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger(__name__)
 
-HF_REPO = "Anand09-in/vaidya-mistral-7b-medmcqa"
+HF_REPO = "SneakySpidy/vaidya-mistral-7b-medmcqa"
 
 
 def parse_args():
