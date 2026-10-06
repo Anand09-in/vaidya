@@ -54,7 +54,7 @@ def load_calibration_data(n=128):
 
 
 def main():
-    from gptqmodel import GPTQModel, QuantizeConfig
+    from gptqmodel import GPTQModel, QuantizeConfig, BACKEND
 
     download_merged()
 
@@ -63,8 +63,11 @@ def main():
 
     quant_cfg = QuantizeConfig(bits=4, group_size=128, desc_act=False)
 
+    # Backend.TORCH avoids Marlin/ExllamaV2 JIT compilation (~2 min) that can
+    # disconnect Lightning.ai studios.
     log.info("Loading merged model for GPTQ calibration...")
-    model = GPTQModel.load(str(MERGED_DIR), quantize_config=quant_cfg)
+    model = GPTQModel.load(str(MERGED_DIR), quantize_config=quant_cfg,
+                           backend=BACKEND.TORCH)
 
     log.info("Quantizing...")
     model.quantize(calib_data)

@@ -53,7 +53,7 @@ echo "Building llama.cpp (cmake)..."
 cd "$LLAMA_DIR"
 cmake -B build -DLLAMA_CUDA=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=native 2>/dev/null \
   || cmake -B build -DCMAKE_BUILD_TYPE=Release  # CPU fallback if no CUDA toolkit
-cmake --build build --config Release -j "$(nproc)" --target llama-quantize convert_hf_to_gguf 2>&1 | tail -5
+cmake --build build --config Release -j "$(nproc)" --target llama-quantize 2>&1 | tail -5
 cd ..
 
 # ── 3. Install conversion deps ─────────────────────────────────────────────

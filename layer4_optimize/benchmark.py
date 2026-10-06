@@ -97,7 +97,7 @@ def bench_hf(model_dir: Path, n_runs: int, label: str):
 
 
 def bench_gptq(n_runs: int):
-    from gptqmodel import GPTQModel
+    from gptqmodel import GPTQModel, BACKEND
     from transformers import AutoTokenizer
     import torch
 
@@ -107,7 +107,8 @@ def bench_gptq(n_runs: int):
         return None
 
     tokenizer = AutoTokenizer.from_pretrained(str(gptq_dir))
-    model = GPTQModel.load(str(gptq_dir), device="cuda:0")
+    # Backend.TORCH skips Marlin JIT (~2 min compile) that disconnects Lightning.ai.
+    model = GPTQModel.load(str(gptq_dir), device="cuda:0", backend=BACKEND.TORCH)
     model.eval()
 
     inputs = tokenizer(TEST_PROMPT, return_tensors="pt").to("cuda")
@@ -168,12 +169,43 @@ def bench_awq(n_runs: int):
     return stats
 
 
+def _patch_cuda_lib_path():
+    """
+    llama-cpp-python is compiled against libcudart.so.12 but Lightning.ai has CUDA 13.
+    Create a symlink libcudart.so.12 -> actual libcudart.so in /tmp/cuda_compat so
+    the dynamic linker can resolve it.
+    """
+    import subprocess
+    from pathlib import Path as _P
+    # Find the real libcudart.so (not .so.12, that's what's missing)
+    out = subprocess.run(
+        "find /usr/local/cuda* -name 'libcudart.so.*' 2>/dev/null | grep -v '\\.12' | head -1",
+        shell=True, capture_output=True, text=True
+    ).stdout.strip()
+    if not out:
+        log.warning("Could not find libcudart.so on this system.")
+        return
+    compat = _P("/tmp/cuda_compat")
+    compat.mkdir(exist_ok=True)
+    symlink = compat / "libcudart.so.12"
+    if not symlink.exists():
+        symlink.symlink_to(out)
+    os.environ["LD_LIBRARY_PATH"] = str(compat) + ":" + os.environ.get("LD_LIBRARY_PATH", "")
+    log.info("CUDA compat: %s -> %s", symlink, out)
+
+
 def bench_gguf(n_runs: int):
+    _patch_cuda_lib_path()
     try:
         from llama_cpp import Llama
-    except ImportError:
-        log.warning("llama-cpp-python not installed — run: pip install llama-cpp-python")
-        return {}
+    except (ImportError, RuntimeError) as e:
+        log.warning("llama-cpp-python unavailable (%s) — recording size only.", e)
+        results = {}
+        for gguf_file in sorted(GGUF_DIR.glob("*.gguf")):
+            tag = gguf_file.stem.replace("vaidya-", "")
+            results[f"gguf_{tag}"] = {"size_mb": file_size_mb(gguf_file),
+                                      "p50_ms": None, "p95_ms": None}
+        return results
 
     results = {}
     for gguf_file in sorted(GGUF_DIR.glob("*.gguf")):
@@ -203,7 +235,9 @@ def print_table(results: dict):
     print("-" * 72)
     for fmt, stats in results.items():
         if stats:
-            print(f"{fmt:<22}  {stats['p50_ms']:>8.1f}  {stats['p95_ms']:>8.1f}  {stats['size_mb']:>9.0f}")
+            p50 = f"{stats['p50_ms']:.1f}" if stats.get('p50_ms') is not None else "  N/A"
+            p95 = f"{stats['p95_ms']:.1f}" if stats.get('p95_ms') is not None else "  N/A"
+            print(f"{fmt:<22}  {p50:>8}  {p95:>8}  {stats['size_mb']:>9.0f}")
     print("=" * 72)
 
 

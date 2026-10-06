@@ -1,0 +1,40 @@
+{
+  "merged_bf16": {
+    "p50_ms": 1233.8,
+    "p95_ms": 1239.4,
+    "mean_ms": 1233.7,
+    "size_mb": 14500.5
+  },
+  "gptq_4bit": {
+    "p50_ms": 2483.7,
+    "p95_ms": 2498.6,
+    "mean_ms": 2484.0,
+    "size_mb": 4172.2
+  },
+  "awq_4bit": {
+    "p50_ms": 2958.7,
+    "p95_ms": 2971.9,
+    "mean_ms": 2945.7,
+    "size_mb": 4167.1
+  },
+  "gguf_Q4_K_M": {
+    "size_mb": 4372.8,
+    "p50_ms": null,
+    "p95_ms": null
+  },
+  "gguf_Q5_K_M": {
+    "size_mb": 5136.2,
+    "p50_ms": null,
+    "p95_ms": null
+  },
+  "gguf_Q8_0": {
+    "size_mb": 7702.6,
+    "p50_ms": null,
+    "p95_ms": null
+  },
+  "gguf_f16": {
+    "size_mb": 14497.3,
+    "p50_ms": null,
+    "p95_ms": null
+  }
+}
