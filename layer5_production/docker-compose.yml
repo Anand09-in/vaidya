@@ -1,0 +1,123 @@
+version: "3.9"
+
+# ── Vaidya serving stack ────────────────────────────────────────────────────
+# GPU mode  (default): vLLM serves AWQ model on GPU
+# CPU mode  (GGUF)   : set BACKEND=ollama, vLLM service is ignored
+#
+# Quick start:
+#   GPU:  docker compose up
+#   CPU:  BACKEND=ollama docker compose up
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+
+  # ── vLLM: OpenAI-compatible GPU inference ────────────────────────────────
+  vllm:
+    image: vllm/vllm-openai:latest
+    runtime: nvidia
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    command: >
+      --model ${VLLM_MODEL:-SneakySpidy/vaidya-mistral-7b-medmcqa}
+      --quantization awq
+      --dtype auto
+      --max-model-len 1024
+      --gpu-memory-utilization 0.90
+      --served-model-name vaidya
+    ports:
+      - "8001:8000"
+    volumes:
+      - huggingface_cache:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+    logging: *default-logging
+    profiles: ["gpu"]
+
+  # ── Ollama: CPU/GGUF inference ────────────────────────────────────────────
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+      - ./models:/models:ro
+    environment:
+      - OLLAMA_MODELS=/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    logging: *default-logging
+    profiles: ["cpu"]
+
+  # ── FastAPI: main application ─────────────────────────────────────────────
+  api:
+    build: ./api
+    ports:
+      - "8000:8000"
+    environment:
+      - BACKEND=${BACKEND:-vllm}
+      - VLLM_URL=http://vllm:8000/v1
+      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-vaidya-q4}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    depends_on:
+      prometheus:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    logging: *default-logging
+    restart: unless-stopped
+
+  # ── Prometheus ────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--storage.tsdb.retention.time=7d"
+      - "--web.enable-lifecycle"
+    logging: *default-logging
+    restart: unless-stopped
+
+  # ── Grafana ───────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-vaidya}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+    logging: *default-logging
+    restart: unless-stopped
+
+volumes:
+  huggingface_cache:
+  ollama_data:
+  prometheus_data:
+  grafana_data:

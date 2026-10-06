@@ -1,13 +1,14 @@
 """
 Vaidya — Phase 3: Accuracy eval
-Base Mistral-7B-Instruct-v0.3 vs fine-tuned (LoRA adapter) on MedMCQA test set.
+Base Mistral-7B-Instruct-v0.3 vs SFT (LoRA) vs DPO on MedMCQA test set.
 
 Usage:
-    python eval_accuracy.py --run-name run2
-    python eval_accuracy.py --run-name run2 --n-samples 1000 --base-only
+    python eval_accuracy.py --run-name run3
+    python eval_accuracy.py --run-name run3 --dpo-run-name dpo-run1
+    python eval_accuracy.py --run-name run3 --dpo-run-name dpo-run1 --finetuned-only
 """
 
-__version__ = "1.1"
+__version__ = "1.2"
 
 import os, re, sys, json, argparse, logging
 from pathlib import Path
@@ -33,11 +34,12 @@ LABEL_MAP = {0: "A", 1: "B", 2: "C", 3: "D"}
 # ── CLI ──────────────────────────────────────────────────────────────────────
 def parse_args():
     p = argparse.ArgumentParser()
-    p.add_argument("--run-name", default="run2", help="LoRA checkpoint run name (matches train.py)")
-    p.add_argument("--n-samples", type=int, default=1000, help="Stratified sample size from test set")
-    p.add_argument("--base-only", action="store_true", help="Only eval base model (skip fine-tuned)")
-    p.add_argument("--finetuned-only", action="store_true", help="Only eval fine-tuned (skip base)")
-    p.add_argument("--debug", action="store_true", help="Print 5 sample generations to verify output format")
+    p.add_argument("--run-name",     default="run3",    help="SFT LoRA checkpoint run name")
+    p.add_argument("--dpo-run-name", default=None,      help="DPO checkpoint run name (skipped if omitted)")
+    p.add_argument("--n-samples",    type=int, default=1000, help="Stratified sample size from test set")
+    p.add_argument("--base-only",    action="store_true", help="Only eval base model")
+    p.add_argument("--finetuned-only", action="store_true", help="Only eval SFT+DPO (skip base)")
+    p.add_argument("--debug",        action="store_true", help="Print 5 sample generations")
     return p.parse_args()
 
 
@@ -94,9 +96,7 @@ def load_base_model():
     return model, tokenizer
 
 
-def load_finetuned_model(run_name: str):
-    model, tokenizer = load_base_model()
-
+def _download_adapter(run_name: str) -> Path:
     adapter_dir = Path(f"./checkpoints/{run_name}")
     if not adapter_dir.exists():
         log.info("Adapter not found locally — downloading from S3...")
@@ -108,15 +108,30 @@ def load_finetuned_model(run_name: str):
         for page in paginator.paginate(Bucket=bucket, Prefix=f"checkpoints/{run_name}/"):
             for obj in page.get("Contents", []):
                 key = obj["Key"]
-                fname = key.split("/", 2)[-1]  # strip checkpoints/run_name/
+                fname = key.split("/", 2)[-1]
                 dest = adapter_dir / fname
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 s3.download_file(bucket, key, str(dest))
         log.info("Adapter downloaded → %s", adapter_dir)
+    return adapter_dir
 
+
+def load_finetuned_model(run_name: str):
+    model, tokenizer = load_base_model()
+    adapter_dir = _download_adapter(run_name)
     model = PeftModel.from_pretrained(model, str(adapter_dir))
     model.eval()
-    log.info("Fine-tuned model loaded from %s", adapter_dir)
+    log.info("SFT model loaded from %s", adapter_dir)
+    return model, tokenizer
+
+
+def load_dpo_model(dpo_run_name: str):
+    """Load base + DPO adapter (DPOTrainer saves SFT+DPO weights into one adapter)."""
+    model, tokenizer = load_base_model()
+    adapter_dir = _download_adapter(dpo_run_name)
+    model = PeftModel.from_pretrained(model, str(adapter_dir))
+    model.eval()
+    log.info("DPO model loaded from %s", adapter_dir)
     return model, tokenizer
 
 
@@ -206,7 +221,8 @@ def evaluate(model, tokenizer, df: pd.DataFrame, batch_size: int = 8, debug: boo
 # ── Main ─────────────────────────────────────────────────────────────────────
 def main():
     args = parse_args()
-    log.info("eval_accuracy.py v%s  |  run=%s  n=%d", __version__, args.run_name, args.n_samples)
+    log.info("eval_accuracy.py v%s  |  sft=%s  dpo=%s  n=%d",
+             __version__, args.run_name, args.dpo_run_name or "skip", args.n_samples)
     setup_mlflow("vaidya-eval", C.S3_BUCKET)
 
     df = load_test_data(args.n_samples)
@@ -222,16 +238,33 @@ def main():
         torch.cuda.empty_cache()
 
     if not args.base_only:
-        log.info("=== Evaluating FINE-TUNED model (run=%s) ===", args.run_name)
+        log.info("=== Evaluating SFT model (run=%s) ===", args.run_name)
         model, tokenizer = load_finetuned_model(args.run_name)
         results["finetuned"] = evaluate(model, tokenizer, df, debug=args.debug)
-        log.info("Fine-tuned accuracy: %.2f%%", results["finetuned"]["accuracy"] * 100)
+        log.info("SFT accuracy: %.2f%%", results["finetuned"]["accuracy"] * 100)
+        del model
+        torch.cuda.empty_cache()
+
+        if args.dpo_run_name:
+            log.info("=== Evaluating DPO model (run=%s) ===", args.dpo_run_name)
+            model, tokenizer = load_dpo_model(args.dpo_run_name)
+            results["dpo"] = evaluate(model, tokenizer, df, debug=args.debug)
+            log.info("DPO accuracy: %.2f%%", results["dpo"]["accuracy"] * 100)
+            del model
+            torch.cuda.empty_cache()
 
     # ── Summary ──────────────────────────────────────────────────────────────
     if "base" in results and "finetuned" in results:
-        delta = results["finetuned"]["accuracy"] - results["base"]["accuracy"]
-        log.info("Delta: %+.2f%%", delta * 100)
-        results["delta"] = delta
+        results["sft_delta"] = results["finetuned"]["accuracy"] - results["base"]["accuracy"]
+        log.info("Base → SFT delta: %+.2f%%", results["sft_delta"] * 100)
+    if "finetuned" in results and "dpo" in results:
+        results["dpo_delta"] = results["dpo"]["accuracy"] - results["finetuned"]["accuracy"]
+        log.info("SFT  → DPO delta: %+.2f%%", results["dpo_delta"] * 100)
+    if "base" in results and "dpo" in results:
+        results["total_delta"] = results["dpo"]["accuracy"] - results["base"]["accuracy"]
+        log.info("Base → DPO total: %+.2f%%", results["total_delta"] * 100)
+    elif "base" in results and "finetuned" in results:
+        results["delta"] = results["sft_delta"]
 
     # ── Save + MLflow ─────────────────────────────────────────────────────────
     out_path = Path("eval_results.json")
@@ -239,13 +272,20 @@ def main():
         json.dump(results, f, indent=2)
     log.info("Saved → %s", out_path)
 
-    with mlflow.start_run(run_name=f"eval-{args.run_name}"):
+    run_label = args.dpo_run_name or args.run_name
+    with mlflow.start_run(run_name=f"eval-{run_label}"):
         if "base" in results:
-            mlflow.log_metric("base_accuracy", results["base"]["accuracy"])
+            mlflow.log_metric("base_accuracy",     results["base"]["accuracy"])
         if "finetuned" in results:
-            mlflow.log_metric("finetuned_accuracy", results["finetuned"]["accuracy"])
-        if "delta" in results:
-            mlflow.log_metric("accuracy_delta", results["delta"])
+            mlflow.log_metric("sft_accuracy",      results["finetuned"]["accuracy"])
+        if "dpo" in results:
+            mlflow.log_metric("dpo_accuracy",      results["dpo"]["accuracy"])
+        if "sft_delta" in results:
+            mlflow.log_metric("sft_delta",         results["sft_delta"])
+        if "dpo_delta" in results:
+            mlflow.log_metric("dpo_delta",         results["dpo_delta"])
+        if "total_delta" in results:
+            mlflow.log_metric("total_delta",       results["total_delta"])
         mlflow.log_artifact(str(out_path))
 
     # ── Push to S3 ───────────────────────────────────────────────────────────
@@ -258,7 +298,7 @@ def main():
     except Exception as e:
         log.warning("S3 upload failed: %s", e)
 
-    log.info("✅ Phase 3 complete.")
+    log.info("✅ Eval complete.")
 
 
 if __name__ == "__main__":
